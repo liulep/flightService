@@ -1,0 +1,103 @@
+image:
+  name: maven:3.3.9-jdk-8
+
+
+stages:
+  - package
+  - build
+  - deploy
+
+variables:
+   MAVEN_OPTS: -Dmaven.repo.local=/root/.m2/repository
+
+cache:
+ key: PortalReportBackend
+ paths:
+  - /root/.m2/repository
+
+package:
+  stage: package
+  script:
+    - echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+      https://maven.apache.org/xsd/settings-1.0.0.xsd">
+      <localRepository>/usr/share/maven/ref/repository</localRepository>
+      <mirrors>
+      <mirror>
+      <id>aliyunmaven</id>
+      <mirrorOf>*</mirrorOf>
+      <name>阿里云公共仓库</name>
+      <url>https://maven.aliyun.com/repository/public</url>
+      </mirror>
+      </mirrors>
+      </settings>' > $HOME/.m2/settings.xml
+    - mvn clean install -Dmaven.test.skip=true
+
+  artifacts:
+    paths:
+      - authService/target/*.jar
+      - gatewayService/target/*.jar
+      - orderService/target/*.jar
+      - queryService/target/*.jar
+      - stockService/target/*.jar
+      - userService/target/*.jar
+      - queryGrayService/target/*.jar
+      - couponService/target/*.jar
+      - integralService/target/*.jar
+
+build:
+  stage: build
+  image: docker:latest
+  variables:
+    DOCKER_DRIVER: overlay
+    DOCKER_HOST: tcp://localhost:2375
+  services:
+    - name: docker:17.03-dind
+      command: ["--insecure-registry=0.0.0.0/0"]
+  script:
+    - docker login -u ${HARBOR_USER} -p ${HARBOR_PASSWD} ${HARBOR_HOST}
+    - cd authService && docker build -t ${HARBOR_HOST}/library/plane-auth-service:v1.${CI_PIPELINE_IID} . && cd ..
+    - cd gatewayService && docker build -t ${HARBOR_HOST}/library/plane-gateway-service:v1.${CI_PIPELINE_IID} . && cd ..
+    - cd orderService && docker build -t ${HARBOR_HOST}/library/plane-order-service:v1.${CI_PIPELINE_IID} . && cd ..
+    - cd queryService && docker build -t ${HARBOR_HOST}/library/plane-query-service:v1.${CI_PIPELINE_IID} . && cd ..
+    - cd stockService && docker build -t ${HARBOR_HOST}/library/plane-stock-service:v1.${CI_PIPELINE_IID} . && cd ..
+    - cd userService && docker build -t ${HARBOR_HOST}/library/plane-user-service:v1.${CI_PIPELINE_IID} . && cd ..
+    - cd queryGrayService && docker build -t ${HARBOR_HOST}/library/plane-query-gray-service:v1.${CI_PIPELINE_IID} . && cd ..
+    - cd couponService && docker build -t ${HARBOR_HOST}/library/plane-coupon-service:v1.${CI_PIPELINE_IID} . && cd ..
+    - cd integralService && docker build -t ${HARBOR_HOST}/library/plane-integral-service:v1.${CI_PIPELINE_IID} . && cd ..
+    - docker push ${HARBOR_HOST}/library/plane-auth-service:v1.${CI_PIPELINE_IID}
+    - docker push ${HARBOR_HOST}/library/plane-gateway-service:v1.${CI_PIPELINE_IID}
+    - docker push ${HARBOR_HOST}/library/plane-order-service:v1.${CI_PIPELINE_IID}
+    - docker push ${HARBOR_HOST}/library/plane-query-service:v1.${CI_PIPELINE_IID}
+    - docker push ${HARBOR_HOST}/library/plane-stock-service:v1.${CI_PIPELINE_IID}
+    - docker push ${HARBOR_HOST}/library/plane-user-service:v1.${CI_PIPELINE_IID}
+    - docker push ${HARBOR_HOST}/library/plane-query-gray-service:v1.${CI_PIPELINE_IID}
+    - docker push ${HARBOR_HOST}/library/plane-coupon-service:v1.${CI_PIPELINE_IID}
+    - docker push ${HARBOR_HOST}/library/plane-integral-service:v1.${CI_PIPELINE_IID}
+
+deploy:
+  image: ${HARBOR_HOST}/library/kubectl:v1.0
+  stage: deploy
+  script:
+    - mkdir /root/.kube/
+    - echo ${TOKEN} |base64 -d > /root/.kube/config
+    # - cat /root/.kube/config
+    - kubectl get pod -n plane-platform
+    - cd yaml/platform
+
+    - sed -i "s|hnkj.*|${HARBOR_HOST}/library/plane-auth-service:v1.${CI_PIPELINE_IID}|g"  plane-auth-deploy.yaml
+    - sed -i "s|hnkj.*|${HARBOR_HOST}/library/plane-gateway-service:v1.${CI_PIPELINE_IID}|g"  plane-gateway-deploy.yaml
+    - sed -i "s|hnkj.*|${HARBOR_HOST}/library/plane-order-service:v1.${CI_PIPELINE_IID}|g"  plane-order-deploy.yaml
+    - sed -i "s|hnkj.*|${HARBOR_HOST}/library/plane-query-service:v1.${CI_PIPELINE_IID}|g"  plane-query-deploy.yaml
+    - sed -i "s|hnkj.*|${HARBOR_HOST}/library/plane-stock-service:v1.${CI_PIPELINE_IID}|g"  plane-stock-deploy.yaml
+    - sed -i "s|hnkj.*|${HARBOR_HOST}/library/plane-user-service:v1.${CI_PIPELINE_IID}|g"  plane-user-deploy.yaml
+    - sed -i "s|hnkj.*|${HARBOR_HOST}/library/plane-query-gray-service:v1.${CI_PIPELINE_IID}|g"  plane-queryGray-deploy.yaml
+    - sed -i "s|hnkj.*|${HARBOR_HOST}/library/plane-coupon-service:v1.${CI_PIPELINE_IID}|g"  plane-coupon-deploy.yaml
+    - sed -i "s|hnkj.*|${HARBOR_HOST}/library/plane-integral-service:v1.${CI_PIPELINE_IID}|g"  plane-integral-deploy.yaml
+    - cat plane-auth-deploy.yaml
+    - kubectl apply -f ./
+    - sleep 8
+    - kubectl get pod -n plane-platform
+
+

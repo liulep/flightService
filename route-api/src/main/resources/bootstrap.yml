@@ -1,0 +1,6 @@
+dynamic:
+  route:
+    data-id: route_config
+    group: ROUTE_GROUP
+    server-addr: 127.0.0.1:8848
+    namespace: 53e032bb-3131-4fb4-86f4-1eabbf9a40ed

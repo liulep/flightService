@@ -1,0 +1,130 @@
+apiVersion: v1
+kind: ConfigMap 
+metadata:
+  namespace: plane
+  name: mysql 
+data: 
+  plane.cnf: |-
+    [mysqld]
+    bind-address = 0.0.0.0
+    default-storage-engine = innodb
+    innodb_file_per_table = on
+    max_connections = 10240
+    max_allowed_packet = 1073741824
+    collation-server = utf8mb4_general_ci
+    character-set-server = utf8mb4
+    read_rnd_buffer_size = 4M
+    table_cache=65535
+    table_definition_cache=65535
+    net_buffer_length=1M
+    bulk_insert_buffer_size=16M
+    query_cache_type=0
+    query_cache_size=0
+    key_buffer_size=8M
+    innodb_buffer_pool_size=4G
+    myisam_sort_buffer_size=32M
+    max_heap_table_size=16M
+    tmp_table_size=16M
+    sort_buffer_size=256K
+    read_buffer_size=128k
+    join_buffer_size=1M
+    thread_stack=256k
+    binlog_cache_size=64K
+    slow_query_log = ON
+    log_output = 'TABLE'
+    long_query_time = 3
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: mysql
+  name: mysql
+  namespace: plane 
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - image: mysql:8
+        name: mysql
+        ports:
+        - containerPort: 3306
+# Probe set
+        readinessProbe:
+          tcpSocket:
+            port: 3306
+          initialDelaySeconds: 60
+          timeoutSeconds: 3
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        livenessProbe:
+          tcpSocket:
+            port: 3306
+          initialDelaySeconds: 60
+          timeoutSeconds: 3
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+# Qos set
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        env:
+#         - name: MYSQL_ROOT_PASSWORD
+#           value: root_001
+         - name: MYSQL_DATABASE
+           value: plane
+# Volume Set
+        volumeMounts:
+         - name: db
+           mountPath: /var/lib/mysql
+         - name: time
+           mountPath: /etc/localtime
+         - name: config
+           mountPath: /etc/mysql/conf.d/plane.cnf
+      volumes:
+       - name: db
+         hostPath: 
+           path: /data/mysql
+       - name: time
+         hostPath:
+           path: /etc/localtime
+       - name: config
+         configMap:
+            name: mysql
+# Node Set
+      nodeSelector:
+       kubernetes.io/hostname: k8s-master-node1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app: mysql
+  name: mysql
+  namespace: plane
+spec:
+  ports:
+  - name: mysql 
+    port: 3306
+    protocol: TCP
+    targetPort: 3306
+  selector:
+    app: mysql
+  type: ClusterIP
+  sessionAffinityConfig:  ## 开启回话保持
+    clientIP:
+      timeoutSeconds: 10800

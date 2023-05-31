@@ -1,0 +1,110 @@
+---
+apiVersion: v1
+kind: ConfigMap 
+metadata:
+  namespace: plane
+  name: redis  ## 名称
+data:  
+  redis.conf: |-
+    dir /var/lib/redis
+    port 6379
+    bind 0.0.0.0
+    appendonly yes
+    protected-mode no
+    requirepass root_001
+    pidfile /var/lib/redis/redis-6379.pid
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: redis
+  name: redis
+  namespace: plane 
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - image: redis
+        command:
+        - "sh"
+        - "-c"
+        - "redis-server /etc/redis.conf"
+        name: redis
+        ports:
+        - containerPort: 6379
+# Probe set
+        readinessProbe:
+          tcpSocket:
+            port: 6379
+          initialDelaySeconds: 60
+          timeoutSeconds: 3
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        livenessProbe:
+          tcpSocket:
+            port: 6379
+          initialDelaySeconds: 60
+          timeoutSeconds: 3
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+# Qos set
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+
+# Volumes set
+        volumeMounts:
+         - name: data
+           mountPath: /var/lib/redis
+         - name: config
+           mountPath: /etc/redis.conf
+         - name: time
+           mountPath: /etc/localtime
+      volumes:
+       - name: data
+         hostPath: 
+           path: /data/redis
+       - name: config
+         configMap:
+            name: redis
+       - name: time
+         hostPath:
+           path: /etc/localtime
+# Node Set
+      nodeSelector:
+       kubernetes.io/hostname: k8s-master-node1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app: redis
+  name: redis
+  namespace: plane
+spec:
+  ports:
+  - name: redis 
+    port: 6379
+    protocol: TCP
+    targetPort: 6379
+  selector:
+    app: redis
+  type: ClusterIP
+  sessionAffinityConfig: 
+    clientIP:
+      timeoutSeconds: 10800

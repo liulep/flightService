@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.yue.spring.mapper.CouponFlowMapper">
+
+    <resultMap id="getUserCouponMap" type="CouponFlowPO">
+        <id column="id" property="id"/>
+        <result column="coupon_id" property="couponId"/>
+        <result column="user_id" property="userId"/>
+        <result column="status" property="status"/>
+        <result column="usage_time" property="usageTime"/>
+        <result column="collection_time" property="collectionTime"/>
+        <result column="expiration_time" property="expirationTime"/>
+        <result column="cid" property="coupon.id"/>
+        <result column="coupon_name" property="coupon.couponName"/>
+        <result column="full_money" property="coupon.fullMoney"/>
+        <result column="minus_money" property="coupon.minusMoney"/>
+        <result column="route_id" property="coupon.routeId"/>
+        <result column="integral" property="coupon.integral"/>
+        <result column="day" property="coupon.day"/>
+        <result column="create_time" property="coupon.createTime"/>
+    </resultMap>
+
+    <select id="getUserCoupon" parameterType="Integer" resultMap="getUserCouponMap">
+        select f.*,c.*,c.id as cid from coupon_flow f
+           LEFT JOIN coupon c
+            on f.coupon_id=c.id
+        where user_id =#{userId}
+          and `status` =0
+        order by (c.full_money-c.minus_money) desc
+    </select>
+
+    <update id="updateCouponStatus">
+        UPDATE coupon_flow set `status`= 2 where expiration_time &lt; now() and `status` = 0
+    </update>
+</mapper>

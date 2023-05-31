@@ -1,0 +1,112 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: rabbitmq
+  namespace: plane 
+data:
+    rabbitmq.conf: |
+      default_user = root
+      default_pass = root_001
+      cluster_formation.peer_discovery_backend = rabbit_peer_discovery_k8s
+      cluster_formation.k8s.host = kubernetes.default.svc.cluster.local
+      cluster_formation.k8s.address_type = hostname
+      cluster_formation.node_cleanup.interval = 30
+      cluster_formation.node_cleanup.only_log_warning = true
+      cluster_partition_handling = autoheal
+      queue_master_locator=min-masters
+      loopback_users.guest = false
+      cluster_formation.randomized_startup_delay_range.min = 0
+      cluster_formation.randomized_startup_delay_range.max = 2
+      cluster_formation.k8s.hostname_suffix = .rabbitmq-cluster.default.svc.cluster.local
+      vm_memory_high_watermark.absolute = 1GB
+      disk_free_limit.absolute = 2GB
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: rabbitmq
+  name: rabbitmq
+  namespace: plane 
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      containers:
+      - image: rabbitmq
+        name: rabbitmq
+        ports:
+        - containerPort: 5672
+# Probe set
+        readinessProbe:
+          tcpSocket:
+            port: 5672
+          initialDelaySeconds: 60
+          timeoutSeconds: 3
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        livenessProbe:
+          tcpSocket:
+            port: 5672
+          initialDelaySeconds: 60
+          timeoutSeconds: 3
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+# Qos set
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+# Volume Set
+        volumeMounts:
+         - name: data
+           mountPath: /var/lib/rabbitmq
+         - name: time
+           mountPath: /etc/localtime
+         - name: config
+           mountPath: /etc/rabbitmq/rabbitmq.conf
+      volumes:
+       - name: data
+         hostPath: 
+           path: /data/rabbitmq
+       - name: time
+         hostPath:
+           path: /etc/localtime
+       - name: config
+         configMap:
+            name: rabbitmq
+# Node Set
+      nodeSelector:
+       kubernetes.io/hostname: k8s-master-node1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app: rabbitmq
+  name: rabbitmq
+  namespace: plane
+spec:
+  ports:
+  - name: rabbitmq 
+    port: 5672
+    protocol: TCP
+    targetPort: 5672
+  selector:
+    app: rabbitmq
+  type: ClusterIP
+  sessionAffinityConfig:  ## 开启回话保持
+    clientIP:
+      timeoutSeconds: 10800

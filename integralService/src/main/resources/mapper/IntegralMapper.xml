@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.yue.spring.mapper.IntegralMapper">
+    <select id="getUserIntegral" parameterType="Integer" resultType="IntegralPo">
+        SELECT
+            id,
+            user_id,
+            sum( integral ) AS integral
+        FROM
+            `integral`
+        WHERE
+            user_id =#{userId}
+    </select>
+</mapper>

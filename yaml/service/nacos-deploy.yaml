@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nacos
+  name: nacos
+  namespace: plane 
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nacos
+  template:
+    metadata:
+      labels:
+        app: nacos
+    spec:
+      containers:
+      - image: nacos/nacos-server
+        name: nacos
+        ports:
+        - containerPort: 8848
+        env:
+        - name: MODE
+          value: "standalone"
+# Probe set
+        readinessProbe:
+          tcpSocket:
+            port: 8848
+          initialDelaySeconds: 60
+          timeoutSeconds: 3
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        livenessProbe:
+          tcpSocket:
+            port: 8848
+          initialDelaySeconds: 60
+          timeoutSeconds: 3
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+# Qos set
+        resources:
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+
+# Volumes set
+        volumeMounts:
+         - name: data
+           mountPath: /var/lib/nacos
+         - name: time
+           mountPath: /etc/localtime
+      volumes:
+       - name: data
+         emptyDir: {}
+       - name: time
+         hostPath:
+           path: /etc/localtime
+# Node Set
+      nodeSelector:
+       kubernetes.io/hostname: k8s-master-node1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app: nacos
+  name: nacos
+  namespace: plane
+spec:
+  ports:
+  - name: nacos
+    port: 8848
+    protocol: TCP
+    targetPort: 8848
+    nodePort: 30848
+  selector:
+    app: nacos
+  type: NodePort 
+  sessionAffinityConfig: 
+    clientIP:
+      timeoutSeconds: 10800

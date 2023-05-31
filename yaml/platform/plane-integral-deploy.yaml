@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: integral
+    version: v1
+  name: integral
+  namespace: plane-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: integral
+  template:
+    metadata:
+      labels:
+        app: integral
+        version: v1
+    spec:
+      containers:
+      - image: hnkjzyxy.com/library/plane-integral-service:v1.0
+        name: integral
+        ports:
+        - containerPort: 8580
+# Probe set
+        readinessProbe:
+          httpGet:
+            port: 8580
+            path: /integral/health
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 3
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            port: 8580
+            path: /integral/health
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 3
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+# Prestop set
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - "curl"
+              - "-X"
+              - "POST"
+              - "http://localhost:8580/integral/shutdown"
+
+# Qos set
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 200m
+            memory: 512Mi
+# Volume Set
+        volumeMounts:
+         - name: time
+           mountPath: /etc/localtime
+      volumes:
+       - name: time
+         hostPath:
+           path: /etc/localtime
+# Node Set
+#      nodeSelector:
+#       kubernetes.io/hostname: k8s-master-node1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app: integral
+  name: integral
+  namespace: plane-platform
+spec:
+  ports:
+  - name: http-integral
+    port: 8580
+    protocol: TCP
+    targetPort: 8580
+  selector:
+    app: integral
+  type: ClusterIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800

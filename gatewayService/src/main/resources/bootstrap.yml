@@ -1,0 +1,31 @@
+server:
+  port: 8080
+spring:
+  application:
+    name: gatewayservice
+  profiles:
+    active: dev
+  cloud:
+    nacos:
+      config:
+        server-addr: hwy.yueue.top:8848
+        username: nacos
+        password: nacos
+        group: GATEWAY_GROUP
+        file-extension: yml
+        shared-configs:
+          - data-id: redis-dev.yml
+            group: REDIS_GROUP
+            refresh: true
+
+          - data-id: nacos-dev.yml
+            group: NACOS_GROUP
+            refresh: true
+
+          - data-id: nacos-dev.yml
+            group: NACOS_GROUP
+            refresh: true
+
+          - data-id: sentinel-dev.yml
+            group: SENTINEL_GROUP
+            refresh: true

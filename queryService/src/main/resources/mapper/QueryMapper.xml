@@ -1,0 +1,359 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.yue.spring.mapper.QueryMapper">
+
+    <cache eviction="LRU"/>
+
+    <resultMap id="routeMap" type="routeVo">
+        <id column="id" property="id"/>
+        <result column="from_addr_id" property="fromAddrId"/>
+        <result column="to_addr_id" property="toAddrId"/>
+        <result column="next_id" property="nextId"/>
+        <result column="next_from_addr_id" property="nextFromAddrId"/>
+        <result column="next_to_addr_id" property="nextToAddrId"/>
+        <association property="fromCity" javaType="City" column="from_addr_id" select="getCityById" fetchType="eager"/>
+        <association property="toCity" javaType="City" column="to_addr_id" select="getCityById" fetchType="eager"/>
+        <association property="nextFromCity" javaType="City" column="next_from_addr_id" select="getCityById"
+                     fetchType="eager"/>
+        <association property="nextToCity" javaType="City" column="next_to_addr_id" select="getCityById"
+                     fetchType="eager"/>
+    </resultMap>
+
+    <resultMap id="routeHotMap" type="routeVo">
+        <id column="id" property="id"/>
+        <result column="from_addr_id" property="fromAddrId"/>
+        <result column="to_addr_id" property="toAddrId"/>
+        <association property="fromCity" javaType="City" column="from_addr_id" select="getCityById" fetchType="eager"/>
+        <association property="toCity" javaType="City" column="to_addr_id" select="getCityById" fetchType="eager"/>
+    </resultMap>
+
+    <resultMap id="routeByIdMap" type="routeEn">
+        <id column="id" property="id"/>
+        <result column="from_addr_id" property="fromAddrId"/>
+        <result column="to_addr_id" property="toAddrId"/>
+        <result column="next_id" property="nextId"/>
+        <result column="next_from_addr_id" property="nextFromAddrId"/>
+        <result column="next_to_addr_id" property="nextToAddrId"/>
+        <association property="fromCity" javaType="City" column="from_addr_id" select="getCityById" fetchType="eager"/>
+        <association property="toCity" javaType="City" column="to_addr_id" select="getCityById" fetchType="eager"/>
+        <association property="nextFromCity" javaType="City" column="next_from_addr_id" select="getCityById"
+                     fetchType="eager"/>
+        <association property="nextToCity" javaType="City" column="next_to_addr_id" select="getCityById"
+                     fetchType="eager"/>
+    </resultMap>
+
+    <sql id="routeSql">
+        <where>
+            <if test="param.now!=null">
+                and str_to_date(#{param.now},'%H:%i:%s') &lt; str_to_date(r.start_time,'%H:%i:%s')
+            </if>
+            <if test="param.startPrice!=null and param.endPrice!=null">
+                and r.price BETWEEN #{param.startPrice} and #{param.endPrice}
+            </if>
+            <if test="param.start!=null and param.end!=null">
+                and r.start_time BETWEEN #{param.start} and #{param.end}
+            </if>
+        </where>
+        <if test="param.sort==0">
+            order by r.price asc
+        </if>
+        <if test="param.sort==1">
+            order by r.price desc
+        </if>
+        <if test="param.sort==2">
+            order by r.punctuality asc
+        </if>
+        <if test="param.sort==3">
+            order by r.punctuality desc
+        </if>
+        <if test="param.sort==4">
+            order by r.start_time asc,r.end_time asc
+        </if>
+        <if test="param.sort==5">
+            order by r.start_time desc,r.end_time desc
+        </if>
+    </sql>
+
+    <sql id="routedSql">
+        <where>
+            and r.to_addr_id=#{param.toAddrId}
+            and r.send_time in(#{param.sendTimeOne},#{param.sendTimeTwo})
+            <if test="param.now!=null">
+                and str_to_date(#{param.now},'%H:%i:%s') &lt; str_to_date(r.start_time,'%H:%i:%s')
+            </if>
+            and str_to_date(r1.end_time,'%H:%i:%s') &lt; str_to_date(r.start_time,'%H:%i:%s')
+            <if test="param.startPrice!=null and param.endPrice!=null">
+                and r.price BETWEEN #{param.startPrice} and #{param.endPrice}
+            </if>
+            <if test="param.start!=null and param.end!=null">
+                and r.start_time BETWEEN #{param.start} and #{param.end}
+            </if>
+        </where>
+        group by r1.to_addr_id
+        order by (r1.price+r.price) asc
+    </sql>
+
+    <sql id="rSql">
+        <if test="param.sort==0">
+            order by (r.price+r.next_price) asc
+        </if>
+        <if test="param.sort==1">
+            order by (r.price+r.next_price) desc
+        </if>
+        <if test="param.sort==2">
+            order by r.punctuality asc
+        </if>
+        <if test="param.sort==3">
+            order by r.punctuality desc
+        </if>
+        <if test="param.sort==4">
+            order by r.start_time asc,r.end_time asc
+        </if>
+        <if test="param.sort==5">
+            order by r.start_time desc,r.end_time desc
+        </if>
+    </sql>
+
+
+    <select id="getRouteInfo" resultMap="routeMap">
+        SELECT
+        *
+        FROM
+        (
+        SELECT
+        *
+        FROM
+        (
+        SELECT
+        r1.id AS id,
+        r.id AS next_id,
+        r1.from_addr_id AS from_addr_id,
+        r1.to_addr_id AS next_to_addr_id,
+        r.to_addr_id AS to_addr_id,
+        r1.flight_num AS flight_num,
+        r1.model AS model,
+        r1.start_time AS start_time,
+        r1.start_airport AS start_airport,
+        r.end_time AS end_time,
+        r.end_airport AS end_airport,
+        r1.punctuality AS punctuality,
+        r1.send_time AS send_time,
+        ( r1.price + r.price ) AS price
+        FROM
+        route r
+        INNER JOIN (
+        SELECT
+        *
+        FROM
+        route
+        WHERE
+        from_addr_id = #{param.fromAddrId}
+        AND to_addr_id IN (
+        SELECT DISTINCT
+        to_addr_id AS id
+        FROM
+        route
+        WHERE
+        from_addr_id = #{param.fromAddrId}
+        AND send_time = #{param.sendTimeOne} UNION
+        SELECT DISTINCT
+        from_addr_id AS id
+        FROM
+        route
+        WHERE
+        to_addr_id = #{param.toAddrId}
+        AND send_time = #{param.sendTimeOne}
+        )
+        AND send_time = #{param.sendTimeOne}
+        ) AS r1 ON r.from_addr_id = r1.to_addr_id
+        WHERE
+        r.to_addr_id = #{param.toAddrId}
+        AND r.send_time IN ( #{param.sendTimeOne}, #{param.sendTimeTwo} )
+        AND str_to_date( r1.end_time, '%H:%i:%s' ) &lt; str_to_date( r.start_time, '%H:%i:%s' )
+        AND r.flight_num = r1.flight_num
+        GROUP BY
+        r1.to_addr_id
+        ORDER BY
+        ( r1.price + r.price ) ASC
+        ) AS r UNION
+        SELECT
+        r.id AS id,
+        r.id AS next_id,
+        r.from_addr_id AS from_addr_id,
+        r.to_addr_id AS next_to_addr_id,
+        r.to_addr_id AS to_addr_id,
+        r.flight_num AS flight_num,
+        r.model AS model,
+        r.start_time AS start_time,
+        r.start_airport AS start_airport,
+        r.end_time AS end_time,
+        r.end_airport AS end_airport,
+        r.punctuality AS punctuality,
+        r.send_time AS send_time,
+        r.price AS price
+        FROM
+        `route` r
+        WHERE
+        r.from_addr_id = #{param.fromAddrId}
+        AND r.to_addr_id = #{param.toAddrId}
+        AND r.send_time = #{param.sendTimeOne}
+        ) AS r
+        <include refid="routeSql"></include>
+    </select>
+
+
+    <select id="getRouteList" parameterType="Map" resultMap="routeMap">
+        select
+        *
+        from (
+        select
+        r1.id as id,
+        r1.from_addr_id as from_addr_id,
+        r1.to_addr_id as to_addr_id,
+        r1.flight_num as flight_num,
+        r1.model as model,
+        r1.start_time as start_time,
+        r1.start_airport as start_airport,
+        r1.end_time as end_time,
+        r1.end_airport as end_airport,
+        r1.punctuality as punctuality,
+        r1.price as price,
+        r1.send_time as sendTime,
+        r.id as next_id,
+        r.from_addr_id as next_from_addr_id,
+        r.to_addr_id as next_to_addr_id,
+        r.flight_num as next_flight_num,
+        r.model as next_model,
+        r.start_time as next_start_time,
+        r.start_airport as next_start_airport,
+        r.end_time as next_end_time,
+        r.end_airport as next_end_airport,
+        r.punctuality as next_punctuality,
+        r.price as next_price,
+        r.send_time as next_send_time
+        from route r
+        inner join (
+        select * from route where from_addr_id=#{param.fromAddrId} and to_addr_id in
+        (
+        select DISTINCT to_addr_id as id from route where from_addr_id=#{param.fromAddrId} and send_time =
+        #{param.sendTimeOne}
+        UNION
+        select DISTINCT from_addr_id as id from route where to_addr_id=#{param.toAddrId} and send_time =
+        #{param.sendTimeOne}
+        )
+        and send_time=#{param.sendTimeOne})as r1
+        on r.from_addr_id=r1.to_addr_id
+        <include refid="routedSql"></include>
+        ) as r
+        <include refid="rSql"></include>
+    </select>
+
+    <select id="getHotCitys" resultMap="routeHotMap">
+        select r.* from route r where r.to_addr_id=#{fromId} and r.from_addr_id in (
+        <foreach collection="toIds" index="index" item="id" separator=",">
+            #{id}
+        </foreach>
+        ) GROUP BY r.from_addr_id order by r.price
+    </select>
+
+    <select id="queryByIds" resultType="int">
+        select r1.id
+        from (select DISTINCT to_addr_id as id
+              from route
+              where from_addr_id = #{fromAddrId}
+                and send_time = #{sendTime}) as r1,
+             (select DISTINCT from_addr_id as id
+              from route
+              where to_addr_id = #{toAddrId}
+                and send_time = #{sendTime}) as r2
+        where r1.id = r2.id
+        order by r1.id
+    </select>
+
+    <select id="getFlightById" parameterType="int" resultType="Flight">
+        select f.id, f.`flight_name`
+        from flight_no f
+        where f.id = #{id}
+    </select>
+
+    <select id="getCityById" parameterType="int" resultType="City">
+        select *
+        from city_detail c
+        where c.id = ${id}
+    </select>
+
+    <select id="getRouteByFlightNum" resultMap="routeHotMap">
+        select *
+        from route
+        where flight_num = #{param.flightNum}
+          and send_time = #{param.sendWeek}
+        order by price
+    </select>
+
+    <select id="getRouteById" parameterType="int" resultMap="routeByIdMap">
+        select *
+        from route
+        where id = #{id} limit 1
+    </select>
+
+    <select id="getRouteInfoById" resultMap="routeByIdMap">
+        select
+        r1.id as id,
+        r1.from_addr_id as from_addr_id,
+        r1.to_addr_id as to_addr_id,
+        r1.flight_num as flight_num,
+        r1.model as model,
+        r1.start_time as start_time,
+        r1.start_airport as start_airport,
+        r1.end_time as end_time,
+        r1.end_airport as end_airport,
+        r1.punctuality as punctuality,
+        r1.price as price,
+        r1.send_time as sendTime
+        <if test="toAddrId!=null and toAddrId!=''">
+            ,r2.id as next_id,
+            r2.from_addr_id as next_from_addr_id,
+            r2.to_addr_id as next_to_addr_id,
+            r2.flight_num as next_flight_num,
+            r2.model as next_model,
+            r2.start_time as next_start_time,
+            r2.start_airport as next_start_airport,
+            r2.end_time as next_end_time,
+            r2.end_airport as next_end_airport,
+            r2.punctuality as next_punctuality,
+            r2.price as next_price,
+            r2.send_time as next_send_time
+        </if>
+        from
+        route as r1
+        <if test="toAddrId!=null and toAddrId!=''">
+            ,(select * from route where id=#{toAddrId}) as r2
+        </if>
+        where r1.id=#{fromAddrId}
+    </select>
+
+    <select id="getRouteByLowPrice" resultType="LowPriceRoute">
+        select c1.id           as from_addr_id,
+               c1.city         as from_city_name,
+               c1.abbreviation as from_abbreviation,
+               c.id            as to_addr_id,
+               c.city          as to_city_name,
+               c.image         as image,
+               c.abbreviation  as to_abbreviation,
+               r.price,
+               r.send_time     as send_time
+        from route r
+                 left join city_detail c
+                           on c.id = r.to_addr_id
+                 left join city_detail c1
+                           on c1.id = r.from_addr_id
+        where r.from_addr_id = #{from_addr_id}
+        GROUP BY r.to_addr_id
+        order by r.price asc limit 9
+    </select>
+
+
+</mapper>
+

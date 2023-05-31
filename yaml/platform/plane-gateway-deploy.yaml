@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: gateway
+    version: v1
+  name: gateway
+  namespace: plane-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+        version: v1
+    spec:
+      containers:
+      - image: hnkjzyxy.com/library/plane-gateway-service:v1.0
+        name: gateway
+        ports:
+        - containerPort: 8080
+# Probe set
+        readinessProbe:
+          httpGet:
+            port: 8080
+            path: /gateway/health
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 3
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            port: 8080
+            path: /gateway/health
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 3
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+# Prestop set
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - "curl"
+              - "-X"
+              - "POST"
+              - "http://localhost:8080/gateway/shutdown"
+
+# Qos set
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 200m
+            memory: 512Mi
+# Volume Set
+        volumeMounts:
+         - name: time
+           mountPath: /etc/localtime
+      volumes:
+       - name: time
+         hostPath:
+           path: /etc/localtime
+# Node Set
+#      nodeSelector:
+#       kubernetes.io/hostname: k8s-master-node1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app: gateway
+  name: gateway
+  namespace: plane-platform
+spec:
+  ports:
+  - name: http-gateway
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+    nodePort: 38080
+  selector:
+    app: gateway
+  type: NodePort
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800

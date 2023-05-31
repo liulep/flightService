@@ -1,0 +1,52 @@
+server:
+  port: 8780
+spring:
+  application:
+    name: couponservice
+  profiles:
+    active: dev
+  cloud:
+    nacos:
+      config:
+        username: nacos
+        password: nacos
+        server-addr: nacos.yueue.top
+        file-extension: yml
+        group: COUPON_GROUP
+        shared-configs:
+          - data-id: nacos-dev.yml
+            group: NACOS_GROUP
+            refresh: true
+
+          - data-id: sentinel-dev.yml
+            group: SENTINEL_GROUP
+            refresh: true
+
+          - data-id: mysql-dev.yml
+            group: MYSQL_GROUP
+            refresh: true
+
+          - data-id: redis-dev.yml
+            group: REDIS_GROUP
+            refresh: true
+
+          - data-id: rabbitmq-dev.yml
+            group: RABBITMQ_GROUP
+            refresh: true
+
+          - data-id: mybatisPlus-dev.yml
+            group: MYBATISPLUS_GROUP
+            refresh: true
+
+          - data-id: mail-dev.yml
+            group: MAIL_GROUP
+            refresh: true
+
+          - data-id: OSS-dev.yml
+            group: OSS_GROUP
+            refresh: true
+nacos:
+  config:
+    server-addr: ${spring.cloud.nacos.config.server-addr}
+
+

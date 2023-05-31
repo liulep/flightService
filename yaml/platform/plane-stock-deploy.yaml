@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: stock
+    version: v1
+  name: stock
+  namespace: plane-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: stock
+  template:
+    metadata:
+      labels:
+        app: stock
+        version: v1
+    spec:
+      containers:
+      - image: hnkjzyxy.com/library/plane-stock-service:v2.0
+        name: stock
+        ports:
+        - containerPort: 8480
+# Probe set
+        readinessProbe:
+          httpGet:
+            port: 8480
+            path: /stock/health
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 3
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            port: 8480
+            path: /stock/health
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 3
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+# Prestop set
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - "curl"
+              - "-X"
+              - "POST"
+              - "http://localhost:8480/stock/shutdown"
+
+# Qos set
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 200m
+            memory: 512Mi
+# Volume Set
+        volumeMounts:
+         - name: time
+           mountPath: /etc/localtime
+      volumes:
+       - name: time
+         hostPath:
+           path: /etc/localtime
+# Node Set
+#      nodeSelector:
+#       kubernetes.io/hostname: k8s-master-node1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app: stock
+  name: stock
+  namespace: plane-platform
+spec:
+  ports:
+  - name: http-stock
+    port: 8480
+    protocol: TCP
+    targetPort: 8480
+  selector:
+    app: stock
+  type: ClusterIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
